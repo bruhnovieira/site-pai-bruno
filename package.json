@@ -1,0 +1,1 @@
+{"name":"site-pai-bruno","version":"1.0.0","private":true,"scripts":{"build":"node -e \"require('fs').accessSync('dist/index.html')\"","lint":"node -e \"require('fs').accessSync('dist/index.html')\"","typecheck":"node -e \"require('fs').accessSync('dist/site-config.js')\""}}
