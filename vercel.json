@@ -1,0 +1,7 @@
+{
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/sitemap.xml", "destination": "/api/sitemap" },
+    { "source": "/:slug([a-z0-9-]+)", "destination": "/api/lp?slug=:slug" }
+  ]
+}
