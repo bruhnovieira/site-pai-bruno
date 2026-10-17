@@ -45,9 +45,16 @@ window.ARCANO = {
     checkoutVerified: { offer: 'x6ba7awn', price: 597, installments: 12, installmentValue: '49,75', interestFree: true }
   },
   guaranteeDays: 7,
+  /* Depoimentos. format: 'audio' (foto + áudio) ou 'video'. video: proporção real do player (w/h).
+     poster/crop: miniatura do YouTube e a área útil dela (frações), para o card não mostrar faixas pretas.
+     Medido em 17/10/2026: Janieth 854×480 (áudio com foto circular), Sheila 360×636 (vertical),
+     Naiara 640×352 (horizontal, com faixas pretas gravadas no próprio vídeo). */
   testimonials: [
-    { name: 'Janieth Costa', id: 'M4clJeavT1o', duration: '0:33' },
-    { name: 'Sheila Coelho', id: '9SrdNWEO4Jw', duration: '1:27' },
-    { name: 'Naiara Reis', id: 'H0s-LDJCLCw', duration: '1:20' }
+    { name: 'Janieth Costa', id: 'M4clJeavT1o', duration: '0:33', format: 'audio', video: 16 / 9,
+      poster: { src: 'hqdefault', w: 480, h: 360, crop: { x: 151 / 480, y: 70 / 360, w: 168 / 480, h: 168 / 360 } } },
+    { name: 'Sheila Coelho', id: '9SrdNWEO4Jw', duration: '1:27', format: 'video', video: 9 / 16,
+      poster: { src: 'hq720', w: 1280, h: 720, crop: { x: 436 / 1280, y: 0, w: 408 / 1280, h: 1 } } },
+    { name: 'Naiara Reis', id: 'H0s-LDJCLCw', duration: '1:20', format: 'video', video: 16 / 9,
+      poster: { src: 'hqdefault', w: 480, h: 360, crop: { x: 155 / 480, y: 48 / 360, w: 170 / 480, h: 264 / 360 } } }
   ]
 };

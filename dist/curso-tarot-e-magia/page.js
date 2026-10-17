@@ -210,13 +210,50 @@
     document.getElementById('depoimentos').hidden = false;
     document.querySelectorAll('[data-testimonials-link]').forEach(function (a) { a.hidden = false; });
   }
+  // Posiciona a miniatura para que a área útil (crop) cubra uma moldura de proporção `ratio` (w/h), centralizada.
+  function cropStyle(p, ratio) {
+    var c = p.crop, R = p.w / p.h, w, h, l, t;
+    if ((c.w * R) / c.h > ratio) { h = 100 / c.h; w = 100 * R / (c.h * ratio); l = 50 - (c.x + c.w / 2) * w; t = -c.y * h; }
+    else { w = 100 / c.w; h = 100 * ratio / (c.w * R); l = -c.x * w; t = 50 - (c.y + c.h / 2) * h; }
+    return 'width:' + w.toFixed(2) + '%;height:' + h.toFixed(2) + '%;left:' + l.toFixed(2) + '%;top:' + t.toFixed(2) + '%';
+  }
+  var modal, modalFrame, modalName, lastTrigger;
+  function openTestimonial(t, trigger) {
+    track('Depoimento_Play', { name: t.name }, true);
+    var src = 'https://www.youtube-nocookie.com/embed/' + t.id + '?autoplay=1&rel=0&modestbranding=1&playsinline=1';
+    if (!window.HTMLDialogElement) { window.open('https://www.youtube.com/watch?v=' + t.id, '_blank', 'noopener'); return; }
+    if (!modal) {
+      modal = document.createElement('dialog');
+      modal.className = 'test-modal';
+      modal.setAttribute('aria-label', 'Depoimento');
+      modal.innerHTML = '<div class="test-modal-box"><button type="button" class="test-modal-close">Fechar <span aria-hidden="true">✕</span></button><div class="test-modal-frame"></div><p class="test-modal-name"></p></div>';
+      document.body.appendChild(modal);
+      modalFrame = modal.querySelector('.test-modal-frame');
+      modalName = modal.querySelector('.test-modal-name');
+      modal.querySelector('.test-modal-close').addEventListener('click', function () { modal.close(); });
+      modal.addEventListener('click', function (e) { if (e.target === modal) modal.close(); });
+      modal.addEventListener('close', function () { modalFrame.innerHTML = ''; if (lastTrigger) lastTrigger.focus(); });
+    }
+    lastTrigger = trigger;
+    modal.style.setProperty('--ar', t.video);
+    modal.setAttribute('aria-label', 'Depoimento de ' + t.name);
+    modal.dataset.format = t.video < 1 ? 'vertical' : 'horizontal';
+    modalName.textContent = t.name + ' · ' + (t.format === 'audio' ? 'depoimento em áudio' : 'depoimento em vídeo');
+    modalFrame.innerHTML = '<iframe src="' + src + '" title="Depoimento de ' + t.name + '" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>';
+    modal.showModal();
+    modal.querySelector('.test-modal-close').focus();
+  }
   (C.testimonialsEnabled ? C.testimonials : []).forEach(function (t) {
-    var card = document.createElement('article'); card.className = 'test-card';
-    card.innerHTML = '<div class="video"><button type="button" class="play"><img src="https://i.ytimg.com/vi/' + t.id + '/hqdefault.jpg" alt="" width="480" height="360" loading="lazy" decoding="async"><span class="play-badge"><b aria-hidden="true">▶</b> ' + t.duration + '<span class="sr-only"> — assistir ao depoimento de ' + t.name + '</span></span></button></div><h3>' + t.name + '</h3><p>Depoimento em vídeo</p>';
-    card.querySelector('.play').addEventListener('click', function () {
-      track('Depoimento_Play', { name: t.name }, true);
-      card.querySelector('.video').innerHTML = '<iframe src="https://www.youtube-nocookie.com/embed/' + t.id + '?autoplay=1&rel=0&modestbranding=1&playsinline=1" title="Depoimento de ' + t.name + '" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>';
-    });
+    var card = document.createElement('article');
+    card.className = 'test-card' + (t.format === 'audio' ? ' is-audio' : '');
+    var img = '<img src="https://i.ytimg.com/vi/' + t.id + '/' + t.poster.src + '.jpg" alt="" loading="lazy" decoding="async" style="' + cropStyle(t.poster, t.format === 'audio' ? 1 : 9 / 16) + '">';
+    var media = t.format === 'audio'
+      ? '<span class="test-audio"><span class="test-avatar">' + img + '</span><span class="test-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></span>'
+      : '<span class="test-poster">' + img + '</span>';
+    var kind = t.format === 'audio' ? 'Depoimento em áudio' : 'Depoimento em vídeo';
+    card.innerHTML = '<button type="button" class="test-media">' + media + '<span class="play-badge"><b aria-hidden="true">▶</b> ' + (t.format === 'audio' ? 'Ouvir' : 'Assistir') + ' · ' + t.duration + '<span class="sr-only"> — ' + kind.toLowerCase() + ' de ' + t.name + '</span></span></button><h3>' + t.name + '</h3><p>' + kind + ' · ' + t.duration + '</p>';
+    var btn = card.querySelector('.test-media');
+    btn.addEventListener('click', function () { openTestimonial(t, btn); });
     grid.appendChild(card);
   });
 
