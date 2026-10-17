@@ -307,6 +307,6 @@ html:has(.test-modal[open]){overflow:hidden}
 .test-modal-close{background:none;border:0;color:#f4f1e9;font:500 .78rem var(--mono);text-transform:uppercase;letter-spacing:.06em;cursor:pointer;padding:.6rem 0;min-height:44px}
 .test-modal-name{align-self:flex-start;margin:0;color:#c9d2cb;font:500 .75rem var(--mono);text-transform:uppercase;letter-spacing:.06em}
 @media (max-width:860px){
-  .test-grid{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:68%;overflow-x:auto;scroll-snap-type:x mandatory;gap:1rem;max-width:none;margin:0 calc(-1 * var(--gutter));padding:0 var(--gutter) .8rem;scroll-padding:0 var(--gutter);-webkit-overflow-scrolling:touch;scrollbar-width:thin}
+  .test-grid{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:min(68%,280px);overflow-x:auto;scroll-snap-type:x mandatory;gap:1rem;max-width:none;margin:0 calc(-1 * var(--gutter));padding:0 var(--gutter) .8rem;scroll-padding:0 var(--gutter);-webkit-overflow-scrolling:touch;scrollbar-width:thin}
   .test-card{scroll-snap-align:start}
 }
