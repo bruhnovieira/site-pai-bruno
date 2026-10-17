@@ -360,3 +360,34 @@ Critério adotado: é "comprovado" o que está no checkout da Hotmart, na págin
 - Sem rolagem horizontal nem texto cortado em 375 px. Preço e botão de compra na primeira dobra do celular e do desktop. Vídeo 16:9 responsivo. Barra fixa funcionando.
 
 **Para publicar (após sua autorização):** `preview: false` em `config.js`; remover a linha `noindex` do HTML; commit; `vercel deploy --prod`; conferir no Test Events; trocar a home ou apontar os anúncios para `/curso-tarot-e-magia`.
+
+---
+
+## 13. Publicação em produção (17/10/2026, ~12:23 BRT)
+
+- **URL:** https://www.paibrunovieira.com.br/. O domínio sem `www` redireciona (308) com a query string preservada.
+- **Deployment de produção:** `dpl_5mViYLUfejobyYoJpvFGS9EVvWuW` (https://site-pai-bruno-k5m13kyl7-pai-bruno.vercel.app), promovido a partir do build de preview já testado `site-pai-bruno-rbqn0pmwf`.
+- **Commits (locais):**
+  - `d7c2ddb`: registra a home antiga que estava no ar sem commit.
+  - `72c188f`: nova página.
+  - O `git push` não foi feito (bloqueado pelas permissões da sessão). Quando você quiser, rode `git push origin main`.
+- **Rollback:**
+  - Imediato: `vercel rollback dpl_42xgsccs13qxEkCxCn969Jxem6oJ` (a home anterior, de 05/10).
+  - No código: `git revert 72c188f`.
+- **Mudanças de roteamento:**
+  - A home `/` passa a ser a página nova.
+  - `/curso-tarot-e-magia` redireciona (307) para `/`, preservando UTMs.
+  - Os botões de compra da `/politica` (via `site-config.js`) agora levam à oferta `x6ba7awn`.
+  - As âncoras antigas (`#metodo`, `#formacao`, `#depoimentos`, `#oferta`) continuam existindo.
+  - `/7chaves`, `/politica`, `/sitemap.xml`, `/robots.txt` e as landing pages da EVORAH (`/{endereço}`) estão intactas.
+- **Testes no site público, sem login:**
+  - Todas as rotas respondem 200.
+  - A home está indexável (sem `noindex`) e sem nenhuma referência a R$ 480.
+  - Lighthouse mobile antes do deploy: 98 / 100 / 100 / 100.
+  - Desktop: botão do card de oferta → checkout `x6ba7awn` com UTMs e `sck=lp_v2_oferta`. Checkout exibe "12 x de R$ 49,75 · Ou R$ 597,00 à vista · Total de R$ 597,00", sem nota de acréscimo.
+  - Celular (375 px): preço e botão na primeira dobra; barra fixa aparece no meio da página e some no topo e na oferta. O toque na barra abriu o checkout com o mesmo preço e `sck=lp_v2_sticky`.
+  - Três depoimentos ativos (343×236 no celular), reproduzindo no player do YouTube.
+- **Rastreamento:**
+  - Test Events (sessão `TEST66819`): `PageView` e `ViewContent` do site "Processado" (configuração manual, com os nossos `eventID`). Da Hotmart, ao abrir o checkout: `PageView` + `InitiateCheckout` (integração de parceiros), 1 por abertura no navegador.
+  - `VSL_Play`, `OfferView` e `CheckoutClick` saem com sucesso para `facebook.com/tr` (verificado na rede), mas a tela padrão do Test Events não lista eventos personalizados. Confira em Visão geral daqui a algumas horas.
+  - Nenhuma compra, nenhum Purchase e nenhuma configuração do pixel alterada.
