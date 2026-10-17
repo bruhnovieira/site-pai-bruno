@@ -1,5 +1,9 @@
 {
   "outputDirectory": "dist",
+  "redirects": [
+    { "source": "/curso-tarot-e-magia", "destination": "/", "permanent": false },
+    { "source": "/curso-tarot-e-magia/", "destination": "/", "permanent": false }
+  ],
   "rewrites": [
     { "source": "/sitemap.xml", "destination": "/api/sitemap" },
     { "source": "/:slug([a-z0-9-]+)", "destination": "/api/lp?slug=:slug" }
