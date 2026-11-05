@@ -48,7 +48,7 @@ window.ARCANO = {
 
   /* Atribuição de vendas na EVORAH (Inteligência de Marketing → Conexões → Site comercial).
      siteId vazio = nada é enviado. Preencha com o ID exibido na EVORAH depois de aplicar a migration. */
-  evorah: { siteId: '', touchUrl: 'https://evorah.app.br/api/public/marketing/touch' },
+  evorah: { siteId: '85ab023a-15c9-48f5-bc31-34ff9ce90550', touchUrl: 'https://evorah.app.br/api/public/marketing/touch' },
 
   /* VSL oficial (enviada em 04/11/2026, 14:56). Anuncia R$ 497 à vista, igual à oferta principal fjjf36k2.
      Anterior: 8JIr3XQJ9yQ (R$ 597, pré-venda) — não usar mais. */
