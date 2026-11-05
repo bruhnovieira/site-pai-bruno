@@ -36,7 +36,19 @@ window.ARCANO = {
      (o GA4/Ads devem ser configurados dentro do contêiner); sem gtmId, carrega o gtag.js direto.
      Eventos enviados: page_view (automático), view_item, begin_checkout (clique para o checkout),
      video_start/video_progress. NUNCA purchase: a compra só pode vir da Hotmart (pagamento confirmado). */
-  google: { ga4Id: '', adsId: '', gtmId: '' },
+  google: { ga4Id: '', adsId: '', gtmId: 'GTM-WLBS5LLC' },
+  /* GTM-WLBS5LLC (04/11/2026): contêiner da conta Google Ads 239-360-6190. Publicado com a tag Google AW-18556789076.
+     O GA4 deve ser criado DENTRO do contêiner (ver docs/google-tracking-2026-11-04.md). Não colocar ga4Id/adsId aqui
+     enquanto houver gtmId: isso duplicaria page_view e conversões. */
+
+  // Aviso de cookies + Consent Mode v2. false = sem aviso (NÃO recomendado: Google e Meta passariam a carregar sem escolha).
+  consentRequired: true,
+  // 'basic' = GTM só depois do aceite (padrão, mais conservador). 'advanced' = GTM já carrega com consentimento negado.
+  consentMode: 'basic',
+
+  /* Atribuição de vendas na EVORAH (Inteligência de Marketing → Conexões → Site comercial).
+     siteId vazio = nada é enviado. Preencha com o ID exibido na EVORAH depois de aplicar a migration. */
+  evorah: { siteId: '', touchUrl: 'https://evorah.app.br/api/public/marketing/touch' },
 
   /* VSL oficial (enviada em 04/11/2026, 14:56). Anuncia R$ 497 à vista, igual à oferta principal fjjf36k2.
      Anterior: 8JIr3XQJ9yQ (R$ 597, pré-venda) — não usar mais. */

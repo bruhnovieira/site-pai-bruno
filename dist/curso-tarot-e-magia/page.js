@@ -17,6 +17,15 @@
 
   O pixel NÃO carrega em prévia (config.preview), fora do domínio de produção, nem com ?debug=1
   (nesse caso os eventos só aparecem no console).
+
+  Consentimento (LGPD, versão de rastreamento 2026-11-04):
+    - Google Consent Mode v2: tudo "denied" por padrão; vira "granted" só quando a pessoa aceita no aviso.
+    - Meta Pixel: fbq('consent','revoke') até o aceite (nenhum evento sai antes).
+    - Atribuição (EVORAH): só depois do aceite. Gera um código aleatório (ev…) guardado 90 dias neste
+      navegador e passado ao checkout como xcod; a Hotmart devolve esse código no webhook da venda
+      confirmada e a EVORAH liga a venda à visita (UTMs e, com aceite de anúncios, gclid/gbraid/wbraid).
+      Nenhum nome, e-mail ou telefone é enviado.
+    ?consent=1 mostra o aviso fora do domínio de produção (teste). A escolha fica em localStorage.
 */
 (function () {
   'use strict';
@@ -72,6 +81,22 @@
     document.querySelectorAll('.pending').forEach(function (el) { el.remove(); });
   }
 
+  /* ---------- Consentimento ---------- */
+  var TRACKING_VERSION = '2026-11-04';
+  var CONSENT_KEY = 'arcano_consent_v1';
+  var consentRequired = C.consentRequired !== false;
+  var consent = null;
+  try { consent = JSON.parse(localStorage.getItem(CONSENT_KEY) || 'null'); } catch (e) { consent = null; }
+  var granted = function (kind) { return !consentRequired || !!(consent && consent[kind]); };
+  window.dataLayer = window.dataLayer || [];
+  function gtagC() { window.dataLayer.push(arguments); }
+  var consentState = function () { var ads = granted('ads') ? 'granted' : 'denied'; return { ad_storage: ads, ad_user_data: ads, ad_personalization: ads, analytics_storage: granted('analytics') ? 'granted' : 'denied' }; };
+  // Precisa vir ANTES do GTM: as tags do Google leem o estado padrão na inicialização.
+  var cDefault = consentState(); cDefault.functionality_storage = 'granted'; cDefault.security_storage = 'granted'; cDefault.wait_for_update = 500;
+  gtagC('consent', 'default', cDefault);
+  gtagC('set', 'ads_data_redaction', true);
+  gtagC('set', 'url_passthrough', true);
+
   /* ---------- Pixel ---------- */
   var uid = function () { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); };
   function track(name, params, custom) {
@@ -80,7 +105,11 @@
     if (debug || C.preview) console.info('[pixel' + (pixelOn ? '' : ' desligado') + ']', name, params, opts);
     if (!pixelOn || typeof window.fbq !== 'function') return;
     window.fbq(custom ? 'trackCustom' : 'track', name, params, opts);
+    // Sem consentimento o pixel não envia. Guardamos o evento para reenviar no aceite com o MESMO eventID
+    // (se a Meta já o tiver enfileirado, ela deduplica pelo eventID).
+    if (consentRequired && !granted('ads')) held.push([custom ? 'trackCustom' : 'track', name, params, opts]);
   }
+  var held = [];
   if (pixelTest) {
     window.__fbqCalls = [];
     window.fbq = function () { window.__fbqCalls.push(Array.prototype.slice.call(arguments)); };
@@ -88,6 +117,7 @@
   } else if (pixelOn) {
     /* Código base do Meta Pixel (mesmo ID da página atual) */
     !function (f, b, e, v, n, t, s) { if (f.fbq) return; n = f.fbq = function () { n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments); }; if (!f._fbq) f._fbq = n; n.push = n; n.loaded = !0; n.version = '2.0'; n.queue = []; t = b.createElement(e); t.async = !0; t.src = v; s = b.getElementsByTagName(e)[0]; s.parentNode.insertBefore(t, s); }(window, document, 'script', 'https://connect.facebook.net/en_US/fbevents.js');
+    if (consentRequired && !granted('ads')) window.fbq('consent', 'revoke');
     window.fbq('init', C.pixelId);
   }
   var contentParams = { content_name: C.productName, content_ids: [C.productId], content_type: 'product', value: offer.price, currency: 'BRL' };
@@ -97,24 +127,32 @@
   /* ---------- Google (GA4 / Ads / GTM) — carrega somente com IDs configurados ---------- */
   var G = C.google || {};
   var googleOn = pixelOn && !pixelTest && !!(G.gtmId || G.ga4Id || G.adsId);
-  window.dataLayer = window.dataLayer || [];
   var gItem = { item_id: C.productId, item_name: C.productName, item_brand: 'Pai Bruno Vieira', item_category: 'Curso online', price: offer.price, quantity: 1 };
-  if (googleOn && G.gtmId) {
-    window.dataLayer.push({ 'gtm.start': Date.now(), event: 'gtm.js' });
-    var gs = document.createElement('script'); gs.async = true; gs.src = 'https://www.googletagmanager.com/gtm.js?id=' + encodeURIComponent(G.gtmId); document.head.appendChild(gs);
-  } else if (googleOn) {
-    window.gtag = function () { window.dataLayer.push(arguments); };
-    var gt = document.createElement('script'); gt.async = true; gt.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(G.ga4Id || G.adsId); document.head.appendChild(gt);
-    window.gtag('js', new Date());
-    if (G.ga4Id) window.gtag('config', G.ga4Id);
-    if (G.adsId) window.gtag('config', G.adsId);
+  // Modo básico (padrão): nada do Google carrega antes do aceite. Modo avançado (consentMode: 'advanced'):
+  // carrega já com tudo "denied" e o Google recebe só sinais sem cookies até o aceite.
+  var googleLoaded = false;
+  function loadGoogle() {
+    if (!googleOn || googleLoaded) return;
+    if (consentRequired && C.consentMode !== 'advanced' && !granted('analytics') && !granted('ads')) return;
+    googleLoaded = true;
+    if (G.gtmId) {
+      window.dataLayer.push({ 'gtm.start': Date.now(), event: 'gtm.js' });
+      var gs = document.createElement('script'); gs.async = true; gs.src = 'https://www.googletagmanager.com/gtm.js?id=' + encodeURIComponent(G.gtmId); document.head.appendChild(gs);
+    } else {
+      window.gtag = gtagC;
+      var gt = document.createElement('script'); gt.async = true; gt.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(G.ga4Id || G.adsId); document.head.appendChild(gt);
+      window.gtag('js', new Date());
+      if (G.ga4Id) window.gtag('config', G.ga4Id);
+      if (G.adsId) window.gtag('config', G.adsId);
+    }
   }
+  loadGoogle();
   function gEvent(name, params, isEcommerce) {
     if (debug || C.preview) console.info('[google' + (googleOn ? '' : ' desligado') + ']', name, params);
     if (!googleOn) return;
     if (G.gtmId) {
       if (isEcommerce) window.dataLayer.push({ ecommerce: null });
-      var payload = { event: name };
+      var payload = { event: name, tracking_version: TRACKING_VERSION };
       if (isEcommerce) payload.ecommerce = params; else for (var k in params) payload[k] = params[k];
       window.dataLayer.push(payload);
     } else {
@@ -124,7 +162,7 @@
   gEvent('view_item', { currency: 'BRL', value: offer.price, items: [gItem] }, true);
 
   /* ---------- Checkout com rastreamento preservado ---------- */
-  var KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'utm_id', 'src', 'sck', 'xcod', 'fbclid', 'gclid'];
+  var KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'utm_id', 'src', 'sck', 'xcod', 'fbclid', 'gclid', 'gbraid', 'wbraid'];
   var stored = {};
   try { stored = JSON.parse(sessionStorage.getItem('arcano_utm') || '{}'); } catch (e) { stored = {}; }
   KEYS.forEach(function (k) { if (qs.get(k)) stored[k] = qs.get(k); });
@@ -136,7 +174,41 @@
     // Hotmart: "src" = origem e "sck" = código de rastreamento, ambos aparecem no relatório de vendas.
     if (!stored.src && stored.utm_source) url.searchParams.set('src', stored.utm_source);
     if (!stored.sck) url.searchParams.set('sck', C.sck + '_' + position);
+    // Código de atribuição da EVORAH (só com consentimento e se o visitante não trouxe um xcod próprio).
+    var aid = (granted('ads') || granted('analytics')) ? attributionId(true) : null;
+    if (aid && !stored.xcod) url.searchParams.set('xcod', aid);
     return url.toString();
+  }
+
+  /* ---------- Atribuição na EVORAH ---------- */
+  var EV = C.evorah || {};
+  var AID_KEY = 'arcano_aid_v1';
+  function attributionId(create) {
+    var id = null;
+    try { var rec = JSON.parse(localStorage.getItem(AID_KEY) || 'null'); if (rec && rec.exp > Date.now() && /^ev[a-z0-9]{10,30}$/.test(rec.id)) id = rec.id; } catch (e) { id = null; }
+    if (!id && create) {
+      var bytes = new Uint8Array(12); (window.crypto || window.msCrypto).getRandomValues(bytes);
+      id = 'ev' + Array.prototype.map.call(bytes, function (b) { return (b % 36).toString(36); }).join('');
+      try { localStorage.setItem(AID_KEY, JSON.stringify({ id: id, exp: Date.now() + 90 * 864e5 })); } catch (e) { /* sem storage: código vale só nesta página */ }
+    }
+    return id;
+  }
+  function gaIds() {
+    var ck = document.cookie || ''; var m = ck.match(/(?:^|; )_ga=GA\d\.\d\.(\d+\.\d+)/); var out = {};
+    if (m) out.clientId = m[1];
+    var sm = ck.match(/(?:^|; )_ga_[A-Z0-9]+=GS\d\.\d\.(?:s)?(\d+)/); if (sm) out.sessionId = sm[1];
+    return out;
+  }
+  var lastTouch = 0;
+  function sendTouch() {
+    if (!EV.siteId || !EV.touchUrl || !(granted('ads') || granted('analytics'))) return;
+    if (!(isProdHost && !C.preview) && !debug) return;
+    if (Date.now() - lastTouch < 3000) return; lastTouch = Date.now();
+    var params = {}; KEYS.forEach(function (k) { if (stored[k] && k !== 'src' && k !== 'sck' && k !== 'xcod') params[k] = stored[k]; });
+    var body = JSON.stringify({ site: EV.siteId, aid: attributionId(true), consent: { ads: granted('ads'), analytics: granted('analytics') }, params: params, path: location.pathname, referrer: document.referrer || '', ga: granted('analytics') ? gaIds() : undefined });
+    if (debug) console.info('[evorah] toque', body);
+    // text/plain = requisição simples (sem preflight); keepalive garante o envio mesmo indo para o checkout.
+    try { fetch(EV.touchUrl, { method: 'POST', body: body, keepalive: true, mode: 'cors', credentials: 'omit', headers: { 'content-type': 'text/plain' } }).catch(function () {}); } catch (e) { /* rede indisponível */ }
   }
 
   var toast;
@@ -152,6 +224,7 @@
     clearTimeout(toast._t); toast._t = setTimeout(function () { toast.hidden = true; }, 6000);
   }
 
+  var begun = {};
   document.querySelectorAll('[data-cta]').forEach(function (a) {
     var position = a.getAttribute('data-cta');
     if (mismatch) {
@@ -163,11 +236,50 @@
     var alt = a.hasAttribute('data-cta-alt') && C.altCheckoutUrl;
     a.setAttribute('href', checkoutHref(position, alt ? C.altCheckoutUrl : C.checkoutUrl));
     a.addEventListener('click', function () {
+      // Recalcula o link (o consentimento pode ter mudado) e atualiza o toque com o client_id do GA4.
+      a.setAttribute('href', checkoutHref(position, alt ? C.altCheckoutUrl : C.checkoutUrl));
+      lastTouch = 0; sendTouch();
       track('CheckoutClick', { position: position, checkout: alt ? 'alternativo' : 'principal', content_ids: [C.productId], value: offer.price, currency: 'BRL' }, true);
       // GA4: begin_checkout = intenção (clique que leva ao checkout externo). Não é compra e não deve ser a conversão principal do Ads.
-      gEvent('begin_checkout', { currency: 'BRL', value: offer.price, cta_position: position, payment_type: alt ? 'parcelamento_hotmart' : 'padrao', items: [gItem] }, true);
+      // Dedupe: um begin_checkout por tipo de checkout por visualização da página (cliques repetidos não inflam o funil).
+      var kind = alt ? 'alt' : 'std';
+      if (!begun[kind]) { begun[kind] = true; gEvent('begin_checkout', { currency: 'BRL', value: offer.price, cta_position: position, payment_type: alt ? 'parcelamento_hotmart' : 'padrao', items: [gItem] }, true); }
     });
   });
+  addEventListener('pageshow', function (e) { if (e.persisted) begun = {}; });
+
+  /* ---------- Aviso de cookies ---------- */
+  var showBanner = consentRequired && ((isProdHost && !C.preview) || qs.get('consent') === '1');
+  function applyConsent(choice) {
+    consent = { ads: !!choice, analytics: !!choice, at: new Date().toISOString(), v: TRACKING_VERSION };
+    try { localStorage.setItem(CONSENT_KEY, JSON.stringify(consent)); } catch (e) { /* escolha vale só nesta visita */ }
+    gtagC('consent', 'update', consentState());
+    loadGoogle(); // no modo básico, o GTM entra agora (os eventos já enfileirados no dataLayer, como view_item, são lidos por ele)
+    window.dataLayer.push({ event: 'consent_update', consent_ads: granted('ads'), consent_analytics: granted('analytics'), tracking_version: TRACKING_VERSION });
+    if (typeof window.fbq === 'function' && (pixelOn || pixelTest)) {
+      window.fbq('consent', granted('ads') ? 'grant' : 'revoke');
+      if (granted('ads')) { held.forEach(function (ev) { window.fbq(ev[0], ev[1], ev[2], ev[3]); }); held = []; }
+    }
+    if (!granted('ads') && !granted('analytics')) { try { localStorage.removeItem(AID_KEY); } catch (e) { /* nada a apagar */ } }
+    document.querySelectorAll('[data-cta]').forEach(function (a) { if (a.getAttribute('aria-disabled') !== 'true') a.setAttribute('href', checkoutHref(a.getAttribute('data-cta'), a.hasAttribute('data-cta-alt') && C.altCheckoutUrl ? C.altCheckoutUrl : C.checkoutUrl)); });
+    sendTouch();
+  }
+  function openBanner() {
+    var box = document.getElementById('consent-box');
+    if (!box) {
+      box = document.createElement('div'); box.id = 'consent-box'; box.className = 'consent'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', 'Preferências de cookies');
+      box.innerHTML = '<p>Usamos cookies para medir as visitas e os anúncios (Google e Meta) e saber o que funciona nesta página. Você escolhe. <a href="/politica#cookies">Política de Privacidade</a></p><div><button type="button" data-consent="0">Recusar</button><button type="button" data-consent="1">Aceitar</button></div>';
+      box.addEventListener('click', function (e) { var b = e.target.closest('[data-consent]'); if (!b) return; applyConsent(b.getAttribute('data-consent') === '1'); box.hidden = true; });
+      document.body.appendChild(box);
+    }
+    box.hidden = false;
+  }
+  if (showBanner && !consent) openBanner();
+  if (consentRequired) {
+    var foot = document.querySelector('.foot p:last-child');
+    if (foot) { var pref = document.createElement('a'); pref.href = '#cookies'; pref.textContent = 'Preferências de cookies'; pref.addEventListener('click', function (e) { e.preventDefault(); openBanner(); }); foot.appendChild(document.createTextNode(' · ')); foot.appendChild(pref); }
+  }
+  sendTouch();
 
   /* ---------- VSL com progresso ---------- */
   var V = C.vsl;
