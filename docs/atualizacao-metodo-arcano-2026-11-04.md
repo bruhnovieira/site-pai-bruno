@@ -81,3 +81,25 @@ No Google Ads, a conversão principal deve ser a compra registrada pela Hotmart,
 3. IDs de GA4 / Google Ads / GTM e configuração do `purchase` na Hotmart.
 4. Conferir no Test Events da Meta, depois do deploy, que PageView/ViewContent continuam chegando.
 5. Legendas/transcrição da VSL nova ainda não disponíveis: a copy não foi alinhada frase a frase ao vídeo.
+
+---
+
+## Atualização 2 — checkouts oficiais e VSL nova no ar (04/11/2026, noite)
+
+Links definidos pelo Pai Bruno e conferidos no payload público (sem compra, sem abrir no navegador):
+
+| | Principal `off=fjjf36k2` | Alternativo `off=gxj0d4vh` |
+|---|---|---|
+| Produto | Curso Completo de Tarot e Magia com Pai Bruno (id 6255680) | mesmo produto (id 6255680) |
+| À vista | R$ 497,00 | R$ 497,00 |
+| Parcelado | cartão até 12× R$ 51,40 (total R$ 616,80, juros do comprador) | só "Parcelamento Hotmart": Pix Parcelado, Boleto Parcelado ou cobrança mensal no cartão "sem comprometer seu limite"; até 12× R$ 51,46 (total R$ 617,52, 3,51% a.m.) |
+| Outras formas | Pix, boleto, PayPal, dois cartões, Apple Pay, cartão virtual | — |
+| Garantia | 7 dias | 7 dias |
+
+Na página:
+- VSL `PjLWENcb39k` no topo (miniatura já gerada). O aviso de "vídeo gravado antes da condição atual" foi removido, porque o preço agora bate.
+- 5 botões principais (topo, conteúdo, investimento, final, barra fixa) → `fjjf36k2`. O botão do investimento diz "Quero garantir minha vaga".
+- 1 botão secundário "Ver opções de parcelamento alternativo" → `gxj0d4vh`. O texto anuncia só o que o checkout oferece e não mostra valores dessa oferta, para não misturar com o 12× R$ 51,40 da principal.
+- Os dois repassam UTMs, `fbclid`, `gclid`, `src` e `sck` (`lp_v3_alternativo` no secundário). O evento `CheckoutClick` leva `checkout: principal|alternativo`.
+- `/politica` (`site-config.js`): o botão "Entrar" também passou para `fjjf36k2`.
+- `npm run conferir` agora confere as duas ofertas, o mesmo produto, as formas do parcelamento alternativo e os links do HTML.

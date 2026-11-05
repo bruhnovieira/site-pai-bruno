@@ -35,26 +35,29 @@
   // Qualquer diferença entre o que a página mostra e o que o checkout cobra bloqueia a compra.
   var mismatch = offer.price !== ver.price || offer.installments !== ver.installments ||
     offer.installmentValue !== ver.installmentValue || !!offer.interestFree !== !!ver.interestFree ||
-    C.checkoutUrl.indexOf('off=' + ver.offer) === -1;
+    C.checkoutUrl.indexOf('off=' + ver.offer) === -1 ||
+    (C.altCheckoutUrl && (!C.altCheckoutVerified || C.altCheckoutUrl.indexOf('off=' + C.altCheckoutVerified.offer) === -1 || C.altCheckoutVerified.price !== offer.price));
   var brl = function (n) { return 'R$ ' + String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.'); };
   var juros = offer.interestFree ? ' sem juros' : '';
   var installmentText = offer.installments + '× de R$ ' + offer.installmentValue + juros;
+  // Com juros do comprador, mostra sempre o total parcelado (transparência; evita parecer "sem juros").
+  var totalText = offer.interestFree ? '' : ' (total R$ ' + offer.installmentTotal + ')';
 
   document.querySelectorAll('[data-price-main]').forEach(function (el) {
     el.innerHTML = brl(offer.price) + '<small>à vista</small>';
   });
   document.querySelectorAll('[data-price-sub]').forEach(function (el) {
-    el.textContent = 'ou ' + installmentText + ' no cartão' + (offer.interestFree ? '' : ' (o parcelamento tem acréscimo)');
+    el.textContent = 'ou em até ' + installmentText + ' no cartão' + totalText;
   });
   document.querySelectorAll('[data-price-line]').forEach(function (el) {
-    el.textContent = brl(offer.price) + ' à vista ou ' + installmentText + ' no cartão';
+    el.textContent = brl(offer.price) + ' à vista ou em até ' + installmentText + ' no cartão';
   });
   document.querySelectorAll('[data-price-short]').forEach(function (el) {
-    el.textContent = brl(offer.price) + ' à vista ou ' + installmentText;
+    el.textContent = brl(offer.price) + ' à vista ou em até ' + installmentText + ' no cartão';
   });
   document.querySelectorAll('[data-sticky-price]').forEach(function (el) { el.textContent = brl(offer.price) + ' ou ' + offer.installments + '× R$ ' + offer.installmentValue; });
   document.querySelectorAll('[data-faq-installments]').forEach(function (el) {
-    el.textContent = 'Cartão de crédito em até ' + installmentText + (offer.interestFree ? ' (total de ' + brl(offer.price) + ')' : '') + ', ou ' + brl(offer.price) + ' à vista no Pix ou no boleto. Também é possível pagar com PayPal ou dividir o valor em dois cartões; nesse caso, as condições aparecem no checkout.';
+    el.textContent = brl(offer.price) + ' à vista no Pix, no boleto, no PayPal ou no cartão. No cartão, também em até ' + installmentText + (offer.interestFree ? ' (total de ' + brl(offer.price) + ')' : totalText) + ', ou dividido em dois cartões. Se preferir não comprometer o limite do cartão, há o parcelamento alternativo da Hotmart (Pix Parcelado, Boleto Parcelado ou cobrança mensal no cartão), com as condições informadas no checkout.';
   });
 
   /* ---------- Prévia ---------- */
@@ -127,8 +130,8 @@
   KEYS.forEach(function (k) { if (qs.get(k)) stored[k] = qs.get(k); });
   try { sessionStorage.setItem('arcano_utm', JSON.stringify(stored)); } catch (e) { /* sem storage: segue só com a URL atual */ }
 
-  function checkoutHref(position) {
-    var url = new URL(C.checkoutUrl);
+  function checkoutHref(position, base) {
+    var url = new URL(base || C.checkoutUrl);
     KEYS.forEach(function (k) { if (stored[k]) url.searchParams.set(k, stored[k]); });
     // Hotmart: "src" = origem e "sck" = código de rastreamento, ambos aparecem no relatório de vendas.
     if (!stored.src && stored.utm_source) url.searchParams.set('src', stored.utm_source);
@@ -157,11 +160,12 @@
       a.addEventListener('click', function (e) { e.preventDefault(); blockedNotice(a); });
       return;
     }
-    a.setAttribute('href', checkoutHref(position));
+    var alt = a.hasAttribute('data-cta-alt') && C.altCheckoutUrl;
+    a.setAttribute('href', checkoutHref(position, alt ? C.altCheckoutUrl : C.checkoutUrl));
     a.addEventListener('click', function () {
-      track('CheckoutClick', { position: position, content_ids: [C.productId], value: offer.price, currency: 'BRL' }, true);
+      track('CheckoutClick', { position: position, checkout: alt ? 'alternativo' : 'principal', content_ids: [C.productId], value: offer.price, currency: 'BRL' }, true);
       // GA4: begin_checkout = intenção (clique que leva ao checkout externo). Não é compra e não deve ser a conversão principal do Ads.
-      gEvent('begin_checkout', { currency: 'BRL', value: offer.price, cta_position: position, items: [gItem] }, true);
+      gEvent('begin_checkout', { currency: 'BRL', value: offer.price, cta_position: position, payment_type: alt ? 'parcelamento_hotmart' : 'padrao', items: [gItem] }, true);
     });
   });
 

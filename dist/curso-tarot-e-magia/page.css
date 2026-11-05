@@ -302,3 +302,11 @@ html:has(.test-modal[open]){overflow:hidden}
   .mid-cta .button{width:100%}
   .aud-grid li{padding:1.4rem 1.2rem}
 }
+/* Investimento: nome do produto e parcelamento alternativo (checkout gxj0d4vh) */
+.price-product{margin:.5rem 0 0;font:400 1.05rem/1.35 var(--serif);color:var(--paper)}
+.alt-pay{margin-top:1.6rem;padding-top:1.4rem;border-top:1px solid var(--line-dark)}
+.alt-pay .alt-title{margin:0 0 .4rem;font:400 1.08rem/1.3 var(--serif);color:var(--gold)}
+.alt-pay p{margin:0 0 1rem;font-size:.88rem;color:#dfe5e0}
+.alt-pay b{color:var(--paper);font-weight:500}
+.button.ghost{background:transparent;color:var(--paper);border:1px solid rgba(244,241,233,.55);box-shadow:none;min-height:52px;font-size:.74rem}
+.button.ghost:hover{background:rgba(244,241,233,.08);border-color:var(--paper)}
