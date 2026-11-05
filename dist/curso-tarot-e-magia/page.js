@@ -9,9 +9,11 @@
     VSL_Play          custom, 1× quando o vídeo de vendas começa
     VSL_Progress      custom, 25/50/75/95% do vídeo (1× cada)
     Depoimento_Play   custom, ao abrir um depoimento
+  Google (só se config.google tiver IDs reais): page_view, view_item, begin_checkout (clique para o checkout),
+  video_start, video_progress. Com gtmId, os mesmos eventos vão para o dataLayer (padrão GA4 ecommerce).
   NÃO disparamos InitiateCheckout no clique: o checkout da Hotmart já envia InitiateCheckout para este
   mesmo pixel quando abre (navegador + servidor). Disparar no clique também duplicava a contagem.
-  Purchase vem somente da Hotmart (pagamento confirmado) — esta página nunca envia Purchase.
+  Purchase/purchase vem somente da Hotmart (pagamento confirmado) — esta página nunca envia compra.
 
   O pixel NÃO carrega em prévia (config.preview), fora do domínio de produção, nem com ?debug=1
   (nesse caso os eventos só aparecem no console).
@@ -45,14 +47,14 @@
     el.textContent = 'ou ' + installmentText + ' no cartão' + (offer.interestFree ? '' : ' (o parcelamento tem acréscimo)');
   });
   document.querySelectorAll('[data-price-line]').forEach(function (el) {
-    el.textContent = brl(offer.price) + ' à vista ou ' + installmentText + ' · garantia de ' + C.guaranteeDays + ' dias';
+    el.textContent = brl(offer.price) + ' à vista ou ' + installmentText + ' no cartão';
   });
   document.querySelectorAll('[data-price-short]').forEach(function (el) {
     el.textContent = brl(offer.price) + ' à vista ou ' + installmentText;
   });
-  document.querySelectorAll('[data-sticky-price]').forEach(function (el) { el.textContent = brl(offer.price) + ' ou ' + offer.installments + '× ' + offer.installmentValue; });
+  document.querySelectorAll('[data-sticky-price]').forEach(function (el) { el.textContent = brl(offer.price) + ' ou ' + offer.installments + '× R$ ' + offer.installmentValue; });
   document.querySelectorAll('[data-faq-installments]').forEach(function (el) {
-    el.textContent = 'Sim. No cartão de crédito em até ' + installmentText + ' (total de ' + brl(offer.price) + '), ou à vista no Pix ou no boleto. Também é possível dividir o pagamento em dois cartões; nesse caso, as condições aparecem no checkout.';
+    el.textContent = 'Cartão de crédito em até ' + installmentText + (offer.interestFree ? ' (total de ' + brl(offer.price) + ')' : '') + ', ou ' + brl(offer.price) + ' à vista no Pix ou no boleto. Também é possível pagar com PayPal ou dividir o valor em dois cartões; nesse caso, as condições aparecem no checkout.';
   });
 
   /* ---------- Prévia ---------- */
@@ -88,6 +90,35 @@
   var contentParams = { content_name: C.productName, content_ids: [C.productId], content_type: 'product', value: offer.price, currency: 'BRL' };
   track('PageView');
   track('ViewContent', contentParams);
+
+  /* ---------- Google (GA4 / Ads / GTM) — carrega somente com IDs configurados ---------- */
+  var G = C.google || {};
+  var googleOn = pixelOn && !pixelTest && !!(G.gtmId || G.ga4Id || G.adsId);
+  window.dataLayer = window.dataLayer || [];
+  var gItem = { item_id: C.productId, item_name: C.productName, item_brand: 'Pai Bruno Vieira', item_category: 'Curso online', price: offer.price, quantity: 1 };
+  if (googleOn && G.gtmId) {
+    window.dataLayer.push({ 'gtm.start': Date.now(), event: 'gtm.js' });
+    var gs = document.createElement('script'); gs.async = true; gs.src = 'https://www.googletagmanager.com/gtm.js?id=' + encodeURIComponent(G.gtmId); document.head.appendChild(gs);
+  } else if (googleOn) {
+    window.gtag = function () { window.dataLayer.push(arguments); };
+    var gt = document.createElement('script'); gt.async = true; gt.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(G.ga4Id || G.adsId); document.head.appendChild(gt);
+    window.gtag('js', new Date());
+    if (G.ga4Id) window.gtag('config', G.ga4Id);
+    if (G.adsId) window.gtag('config', G.adsId);
+  }
+  function gEvent(name, params, isEcommerce) {
+    if (debug || C.preview) console.info('[google' + (googleOn ? '' : ' desligado') + ']', name, params);
+    if (!googleOn) return;
+    if (G.gtmId) {
+      if (isEcommerce) window.dataLayer.push({ ecommerce: null });
+      var payload = { event: name };
+      if (isEcommerce) payload.ecommerce = params; else for (var k in params) payload[k] = params[k];
+      window.dataLayer.push(payload);
+    } else {
+      window.gtag('event', name, params);
+    }
+  }
+  gEvent('view_item', { currency: 'BRL', value: offer.price, items: [gItem] }, true);
 
   /* ---------- Checkout com rastreamento preservado ---------- */
   var KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'utm_id', 'src', 'sck', 'xcod', 'fbclid', 'gclid'];
@@ -129,6 +160,8 @@
     a.setAttribute('href', checkoutHref(position));
     a.addEventListener('click', function () {
       track('CheckoutClick', { position: position, content_ids: [C.productId], value: offer.price, currency: 'BRL' }, true);
+      // GA4: begin_checkout = intenção (clique que leva ao checkout externo). Não é compra e não deve ser a conversão principal do Ads.
+      gEvent('begin_checkout', { currency: 'BRL', value: offer.price, cta_position: position, items: [gItem] }, true);
     });
   });
 
@@ -136,19 +169,9 @@
   var V = C.vsl;
   var vslBox = document.querySelector('.video[data-video="vsl"]');
   var thumb = document.querySelector('[data-vsl-thumb]');
-  if (thumb) thumb.src = 'https://i.ytimg.com/vi/' + V.id + '/maxresdefault.jpg';
-  document.querySelectorAll('[data-vsl-duration]').forEach(function (el) { el.textContent = V.duration ? ' · ' + V.duration : ''; });
+  // A miniatura já vem no HTML (carrega cedo, sem JS); só troca se o vídeo configurado for outro.
+  if (thumb && thumb.src.indexOf('/vi/' + V.id + '/') === -1) thumb.src = 'https://i.ytimg.com/vi/' + V.id + '/maxresdefault.jpg';
   document.querySelectorAll('[data-vsl-note]').forEach(function (el) { el.textContent = V.note || ''; el.hidden = !V.note; });
-  var chapList = document.getElementById('vsl-chapters');
-  if (chapList) {
-    chapList.hidden = !V.chapters.length;
-    V.chapters.forEach(function (c) {
-      var li = document.createElement('li');
-      var mm = Math.floor(c.t / 60) + ':' + ('0' + (c.t % 60)).slice(-2);
-      li.innerHTML = '<button type="button" data-seek="' + c.t + '"><time>' + mm + '</time> ' + c.label + '</button>';
-      chapList.appendChild(li);
-    });
-  }
   var player = null, ytReady = null, sent = {};
   function loadYT() {
     if (ytReady) return ytReady;
@@ -167,18 +190,20 @@
     var holder = document.createElement('div'); holder.id = 'vsl-player';
     vslBox.innerHTML = ''; vslBox.appendChild(holder);
     track('VSL_Play', { video: V.id, start: at || 0 }, true);
+    gEvent('video_start', { video_provider: 'youtube', video_title: V.title, video_url: 'https://youtu.be/' + V.id });
     loadYT().then(function () {
       player = new window.YT.Player('vsl-player', {
         host: 'https://www.youtube-nocookie.com', videoId: V.id,
+        // autoplay só depois do clique do visitante (gesto do usuário); nunca ao carregar a página.
         playerVars: { autoplay: 1, start: at || 0, rel: 0, modestbranding: 1, playsinline: 1 },
         events: {
-          onReady: function (e) { e.target.getIframe().title = 'Vídeo de apresentação do Curso Completo de Tarot e Magia'; },
+          onReady: function (e) { e.target.getIframe().title = V.title || 'Vídeo de apresentação do Curso Completo de Tarot e Magia'; },
           onStateChange: function (e) { if (e.data === 1) watchProgress(); }
         }
       });
     });
   }
-  // Percentual = tempo REALMENTE assistido / duração (pular para um capítulo não conta como assistido).
+  // Percentual = tempo REALMENTE assistido / duração (pular trechos não conta como assistido).
   var progressTimer, watched = 0, lastT = null;
   function watchProgress() {
     clearInterval(progressTimer);
@@ -190,18 +215,19 @@
       if (lastT !== null && t > lastT && t - lastT < 2.5) watched += t - lastT;
       lastT = t;
       [25, 50, 75, 95].forEach(function (p) {
-        if (!sent[p] && watched / d * 100 >= p) { sent[p] = true; track('VSL_Progress', { video: V.id, percent: p }, true); }
+        if (!sent[p] && watched / d * 100 >= p) {
+          sent[p] = true;
+          track('VSL_Progress', { video: V.id, percent: p }, true);
+          gEvent('video_progress', { video_provider: 'youtube', video_title: V.title, video_percent: p });
+        }
       });
       if (player.getPlayerState && player.getPlayerState() !== 1) clearInterval(progressTimer);
     }, 1000);
   }
   if (vslBox) vslBox.querySelector('.play').addEventListener('click', function () { startVsl(0); });
-  document.querySelectorAll('[data-seek]').forEach(function (b) {
-    b.addEventListener('click', function () { startVsl(Number(b.getAttribute('data-seek'))); vslBox.scrollIntoView({ behavior: 'smooth', block: 'center' }); });
-  });
   // Miniatura em alta resolução indisponível → usa a padrão
   document.querySelectorAll('.video img').forEach(function (img) {
-    img.addEventListener('error', function () { if (!/hqdefault/.test(img.src)) img.src = img.src.replace(/maxresdefault|sddefault/, 'hqdefault'); });
+    img.addEventListener('error', function () { if (!/hqdefault/.test(img.src)) img.src = img.src.replace(/maxresdefault|sddefault|hq720/, 'hqdefault'); });
   });
 
   /* ---------- Depoimentos (só com autorização confirmada: config.testimonialsEnabled) ---------- */
@@ -277,7 +303,7 @@
 
   /* ---------- Sticky mobile + OfferView ---------- */
   var sticky = document.querySelector('.sticky');
-  var hero = document.querySelector('.hero');
+  var hero = document.querySelector('.hero-wrap');
   var offerSec = document.getElementById('oferta');
   var finalSec = document.querySelector('.final');
   var state = { heroVisible: true, offerVisible: false, finalVisible: false };

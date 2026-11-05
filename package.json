@@ -1,1 +1,12 @@
-{"name": "site-pai-bruno", "version": "1.0.0", "private": true, "scripts": {"build": "node -e \"require('fs').accessSync('dist/index.html')\"", "lint": "node -e \"require('fs').accessSync('dist/index.html')\" && node --check api/lp.js && node --check api/sitemap.js", "typecheck": "node -e \"require('fs').accessSync('dist/site-config.js')\""}, "type": "module"}
+{
+  "name": "site-pai-bruno",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "node -e \"require('fs').accessSync('dist/index.html')\"",
+    "lint": "node -e \"require('fs').accessSync('dist/index.html')\" && node --check api/lp.js && node --check api/sitemap.js && node --check dist/curso-tarot-e-magia/page.js && node --check scripts/conferir-oferta.mjs",
+    "typecheck": "node -e \"require('fs').accessSync('dist/site-config.js')\"",
+    "conferir": "node scripts/conferir-oferta.mjs"
+  },
+  "type": "module"
+}

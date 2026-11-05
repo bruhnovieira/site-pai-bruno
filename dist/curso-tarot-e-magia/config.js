@@ -1,16 +1,17 @@
 /*
-  Configuração da nova página de vendas (Curso Completo de Tarot e Magia — Método Arcano).
-  Tudo que é comercial (preço, parcelamento, checkout, modo prévia) fica AQUI, não no HTML.
+  Configuração da página de vendas (Curso Completo de Tarot e Magia — Método Arcano).
+  Tudo que é comercial (preço, parcelamento, checkout, vídeo, rastreamento) fica AQUI, não no HTML.
+  Antes de publicar qualquer mudança aqui, rode:  node scripts/conferir-oferta.mjs
+  (lê o checkout público da Hotmart e o status do vídeo no YouTube, sem abrir navegador e sem disparar pixel).
 
-  Oferta conferida em 17/10/2026 no payload público do checkout (sem compra):
+  Oferta conferida em 04/11/2026 no payload público do checkout (sem compra):
   - https://pay.hotmart.com/D101917640B?off=x6ba7awn → oferta "x6ba7awn" ("Novembro 2026")
-    R$ 597,00 à vista · 12× de R$ 49,75 (total R$ 597,00, juros absorvidos pelo produtor) · máx. 12×
+    R$ 597,00 à vista · 12× de R$ 49,75 (total R$ 597,00, juros absorvidos pelo produtor) · garantia 7 dias.
     Cartão, dois cartões, Pix, boleto, PayPal, Apple Pay.
-  - Não usar a oferta padrão "5zft0ttu" nem a "6x3p7uv7" (cobra juros no parcelamento).
+  - Não usar a oferta padrão "5zft0ttu" (R$ 480) nem a "6x3p7uv7" (cobra juros no parcelamento).
 
-  Publicada em produção como página inicial (/) em 17/10/2026. Se `offer` deixar de ser igual a
-  `offer.checkoutVerified`, a página bloqueia os botões de compra sozinha. `preview: true` volta ao modo prévia
-  (sem pixel, com barra de aviso).
+  Se `offer` deixar de ser igual a `offer.checkoutVerified`, a página bloqueia os botões de compra sozinha.
+  `preview: true` volta ao modo prévia (sem pixel, com barra de aviso).
 */
 window.ARCANO = {
   preview: false,
@@ -20,20 +21,28 @@ window.ARCANO = {
   productId: 'D101917640B',
   productName: 'Curso Completo de Tarot e Magia',
   // Código de origem que vai para o relatório da Hotmart (parâmetro sck) quando o visitante não traz um.
-  sck: 'lp_v2',
-  // VSL: para trocar pelo vídeo novo, mude id, duration e chapters (ou deixe chapters: []) e ajuste/remova note.
+  sck: 'lp_v3',
+
+  /* Google (GA4 / Google Ads / Google Tag Manager).
+     Vazio = nada do Google carrega. Preencha só com IDs reais da conta do Pai Bruno:
+       ga4Id: 'G-XXXXXXXXXX'   adsId: 'AW-XXXXXXXXX'   gtmId: 'GTM-XXXXXXX'
+     Com gtmId preenchido, a página carrega SÓ o GTM e entrega os eventos no dataLayer
+     (o GA4/Ads devem ser configurados dentro do contêiner); sem gtmId, carrega o gtag.js direto.
+     Eventos enviados: page_view (automático), view_item, begin_checkout (clique para o checkout),
+     video_start/video_progress. NUNCA purchase: a compra só pode vir da Hotmart (pagamento confirmado). */
+  google: { ga4Id: '', adsId: '', gtmId: '' },
+
+  /* VSL. A nova VSL (PjLWENcb39k, enviada em 04/11/2026) ainda estava "sendo processada" no YouTube
+     e anuncia R$ 497 / 12× R$ 51,40, condição que NÃO existe no checkout (que cobra R$ 597).
+     Para ativá-la: (1) criar na Hotmart a oferta de R$ 497, (2) trocar checkoutUrl/offer/checkoutVerified
+     acima pelos valores dessa oferta, (3) trocar `vsl` por `vslNova` (sem note), (4) rodar o script de conferência. */
   vsl: {
     id: '8JIr3XQJ9yQ',
-    duration: '6:29',
-    note: 'Este vídeo foi gravado antes da condição atual. Prevalecem o preço e as condições desta página e do checkout.',
-    chapters: [
-      { t: 0, label: 'Para quem é' },
-      { t: 116, label: 'Quem sou eu e por que criei o método' },
-      { t: 167, label: 'O erro da decoreba e os 3 pilares' },
-      { t: 225, label: 'Três exercícios práticos' },
-      { t: 306, label: 'O que a formação inclui' }
-    ]
+    title: 'Apresentação do Curso Completo de Tarot e Magia',
+    note: 'Este vídeo foi gravado antes da condição atual. Prevalecem o preço e as condições desta página e do checkout.'
   },
+  vslNova: { id: 'PjLWENcb39k', title: 'Curso Completo de Tarot e Magia com Pai Bruno', note: '' },
+
   // Depoimentos: autorização de uso confirmada pelo Pai Bruno em 17/10/2026.
   testimonialsEnabled: true,
   offer: {
@@ -41,14 +50,12 @@ window.ARCANO = {
     installments: 12,
     installmentValue: '49,75',
     interestFree: true,
-    // O que o checkout da oferta x6ba7awn cobra (conferido em 17/10/2026).
+    // O que o checkout da oferta x6ba7awn cobra (conferido em 04/11/2026).
     checkoutVerified: { offer: 'x6ba7awn', price: 597, installments: 12, installmentValue: '49,75', interestFree: true }
   },
   guaranteeDays: 7,
   /* Depoimentos. format: 'audio' (foto + áudio) ou 'video'. video: proporção real do player (w/h).
-     poster/crop: miniatura do YouTube e a área útil dela (frações), para o card não mostrar faixas pretas.
-     Medido em 17/10/2026: Janieth 854×480 (áudio com foto circular), Sheila 360×636 (vertical),
-     Naiara 640×352 (horizontal, com faixas pretas gravadas no próprio vídeo). */
+     poster/crop: miniatura do YouTube e a área útil dela (frações), para o card não mostrar faixas pretas. */
   testimonials: [
     { name: 'Janieth Costa', id: 'M4clJeavT1o', duration: '0:33', format: 'audio', video: 16 / 9,
       poster: { src: 'hqdefault', w: 480, h: 360, crop: { x: 151 / 480, y: 70 / 360, w: 168 / 480, h: 168 / 360 } } },
